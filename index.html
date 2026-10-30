@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>수달일까? 족제비일까?</title>
+
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap");
+
+      :root {
+        --ink: #34443d;
+        --green: #5b8c72;
+        --mint: #e8f4e9;
+        --cream: #fffaf0;
+        --peach: #ffe8d9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Noto Sans KR", sans-serif;
+        background:
+          radial-gradient(circle at 10% 10%, #f8e9d9 0 10%, transparent 11%),
+          linear-gradient(135deg, #f5f8e9, #e8f3eb 55%, #fff1e7);
+      }
+
+      .wrap {
+        width: min(960px, 92%);
+        margin: 0 auto;
+        padding: 38px 0 56px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        background: #fff;
+        border: 1px solid #e3eadf;
+        border-radius: 99px;
+        padding: 7px 15px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #64816c;
+      }
+
+      h1 {
+        font-family: "Jua", sans-serif;
+        font-size: clamp(36px, 7vw, 58px);
+        margin: 14px 0 8px;
+        letter-spacing: -1px;
+      }
+
+      .sub {
+        margin: 0;
+        color: #718078;
+        font-size: 15px;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: 26px;
+        padding: 24px;
+        box-shadow: 0 14px 40px #506b5514;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin: 0 0 18px;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        border-radius: 13px;
+        padding: 12px 18px;
+        transition:
+          0.18s transform,
+          0.18s filter;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        filter: brightness(0.98);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .tab {
+        flex: 1;
+        background: #f1f5ef;
+        color: #718078;
+      }
+
+      .tab.active {
+        background: #5b8c72;
+        color: white;
+      }
+
+      .primary {
+        background: #5b8c72;
+        color: white;
+      }
+
+      .soft {
+        background: #edf5ed;
+        color: #55745d;
+      }
+
+      .workarea {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 20px;
+        align-items: stretch;
+      }
+
+      .stage {
+        min-height: 330px;
+        border: 2px dashed #d4e3d5;
+        border-radius: 20px;
+        background: #f8fbf6;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 18px;
+        text-align: center;
+      }
+
+      .stage .emoji {
+        font-size: 64px;
+        line-height: 1.2;
+      }
+
+      .stage p {
+        color: #829087;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      #preview {
+        max-width: 100%;
+        max-height: 350px;
+        border-radius: 15px;
+        display: none;
+        object-fit: contain;
+      }
+
+      #cameraVideo {
+        display: none;
+        width: 100%;
+        max-width: 420px;
+        border-radius: 15px;
+        transform: scaleX(-1);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        justify-content: center;
+        margin-top: 15px;
+      }
+
+      .upload-label {
+        display: inline-block;
+        cursor: pointer;
+        border-radius: 13px;
+        padding: 12px 18px;
+        font-weight: 700;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .results h2 {
+        font-family: "Jua", sans-serif;
+        font-size: 25px;
+        margin: 3px 0 6px;
+      }
+
+      .hint {
+        color: #859087;
+        font-size: 13px;
+        margin: 0 0 20px;
+      }
+
+      .animal {
+        padding: 15px;
+        border-radius: 17px;
+        margin: 12px 0;
+        background: #f5f8f1;
+      }
+
+      .animal.otter {
+        background: #eaf4ed;
+      }
+
+      .animal.weasel {
+        background: #fff0e6;
+      }
+
+      .animalhead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 900;
+      }
+
+      .animalname {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 17px;
+      }
+
+      .percent {
+        font-family: "Jua", sans-serif;
+        font-size: 25px;
+      }
+
+      .bar {
+        height: 12px;
+        background: #e3e9e1;
+        border-radius: 99px;
+        overflow: hidden;
+        margin-top: 11px;
+      }
+
+      .fill {
+        height: 100%;
+        width: 0;
+        border-radius: 99px;
+        transition: width 0.35s ease;
+        background: #6eaa83;
+      }
+
+      .weasel .fill {
+        background: #e9a16d;
+      }
+
+      .winner {
+        margin-top: 17px;
+        border-radius: 17px;
+        background: #fff8e9;
+        padding: 15px;
+        text-align: center;
+        font-weight: 700;
+        color: #806746;
+        min-height: 54px;
+      }
+
+      .status {
+        text-align: center;
+        color: #809087;
+        font-size: 13px;
+        min-height: 22px;
+        margin-top: 14px;
+        line-height: 1.5;
+      }
+
+      .foot {
+        text-align: center;
+        font-size: 12px;
+        color: #98a39b;
+        margin-top: 22px;
+        line-height: 1.6;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 720px) {
+        .workarea {
+          grid-template-columns: 1fr;
+        }
+
+        .card {
+          padding: 17px;
+        }
+
+        .stage {
+          min-height: 260px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="wrap">
+      <header>
+        <span class="eyebrow">🦦 AI 동물 판별 연구소</span>
+
+        <h1>수달일까? 족제비일까?</h1>
+
+        <p class="sub">사진을 올리거나 카메라를 켜서 AI에게 물어보세요!</p>
+      </header>
+
+      <section class="card">
+        <div class="tabs">
+          <button class="tab active" id="uploadTab">📁 사진 업로드</button>
+
+          <button class="tab" id="cameraTab">📷 웹캠 사용</button>
+        </div>
+
+        <div class="workarea">
+          <div>
+            <div class="stage" id="stage">
+              <div class="emoji" id="emptyEmoji">🦦 🐾</div>
+
+              <b id="emptyTitle"> 여기에 사진이 나타나요! </b>
+
+              <p id="emptyText">
+                AI 모델을 불러오는 중이에요.<br />
+                잠시만 기다려 주세요!
+              </p>
+
+              <img id="preview" alt="업로드한 사진" />
+
+              <video id="cameraVideo" autoplay muted playsinline></video>
+            </div>
+
+            <div class="actions" id="uploadActions">
+              <label class="primary upload-label" for="imageInput">
+                사진 고르기
+              </label>
+
+              <input id="imageInput" type="file" accept="image/*" />
+
+              <button class="soft" id="analyzeImage" disabled>
+                🔎 판별하기
+              </button>
+            </div>
+
+            <div class="actions hidden" id="cameraActions">
+              <button class="primary" id="startCamera" disabled>
+                카메라 켜기
+              </button>
+
+              <button class="soft" id="stopCamera" disabled>카메라 끄기</button>
+            </div>
+          </div>
+
+          <div class="results">
+            <h2>🔍 AI 판별 결과</h2>
+
+            <p class="hint">AI가 예측한 각 동물일 가능성이에요.</p>
+
+            <div class="animal otter">
+              <div class="animalhead">
+                <span class="animalname"> 🦦 수달 </span>
+
+                <span class="percent" id="otterPercent"> --% </span>
+              </div>
+
+              <div class="bar">
+                <div class="fill" id="otterBar"></div>
+              </div>
+            </div>
+
+            <div class="animal weasel">
+              <div class="animalhead">
+                <span class="animalname"> 🐾 족제비 </span>
+
+                <span class="percent" id="weaselPercent"> --% </span>
+              </div>
+
+              <div class="bar">
+                <div class="fill" id="weaselBar"></div>
+              </div>
+            </div>
+
+            <div class="winner" id="winner">
+              아직 판별 전이에요. 어떤 동물일까요? 👀
+            </div>
+
+            <div class="status" id="status">AI 모델을 연결하고 있어요...</div>
+          </div>
+        </div>
+      </section>
+
+      <p class="foot">
+        ※ 결과는 학습 데이터와 사진 상태에 따라 달라질 수 있어요.<br />
+        AI의 예측이 항상 정답인 것은 아니랍니다!
+      </p>
+    </main>
+
+    <script>
+      // Teachable Machine 모델 주소
+      const MODEL_URL =
+        "https://teachablemachine.withgoogle.com/models/7_cTvCQGBU/";
+
+      let model = null;
+      let cameraStream = null;
+      let cameraRunning = false;
+      let selectedImage = null;
+      let animationId = null;
+
+      const $ = (id) => document.getElementById(id);
+
+      // 상태 메시지 변경
+      function setStatus(message) {
+        $("status").textContent = message;
+      }
+
+      // 결과 초기화
+      function resetResults() {
+        $("otterPercent").textContent = "--%";
+        $("weaselPercent").textContent = "--%";
+
+        $("otterBar").style.width = "0%";
+        $("weaselBar").style.width = "0%";
+
+        $("winner").textContent = "AI가 사진을 살펴볼 준비가 됐어요! 👀";
+      }
+
+      // 클래스 이름으로 수달과 족제비 찾기
+      function findClass(predictions, keywords) {
+        return predictions.find((item) =>
+          keywords.some((word) => item.className.toLowerCase().includes(word)),
+        );
+      }
+
+      // 예측 결과 화면에 표시
+      function showPredictions(predictions) {
+        const otter = findClass(predictions, ["수달", "otter"]);
+
+        const weasel = findClass(predictions, ["족제비", "weasel"]);
+
+        if (!otter || !weasel) {
+          setStatus(
+            "모델 클래스 이름을 확인해 주세요. 수달과 족제비가 필요해요.",
+          );
+
+          return;
+        }
+
+        const otterScore = otter.probability * 100;
+
+        const weaselScore = weasel.probability * 100;
+
+        $("otterPercent").textContent = otterScore.toFixed(1) + "%";
+
+        $("weaselPercent").textContent = weaselScore.toFixed(1) + "%";
+
+        $("otterBar").style.width = otterScore + "%";
+
+        $("weaselBar").style.width = weaselScore + "%";
+
+        const isOtter = otterScore >= weaselScore;
+
+        $("winner").textContent = isOtter
+          ? "🦦 이 사진은 수달일 가능성이 더 높아요!"
+          : "🐾 이 사진은 족제비일 가능성이 더 높아요!";
+
+        setStatus("판별 완료! 다른 사진도 시험해 보세요.");
+      }
+
+      // 모델 자동 로딩
+      async function loadModel() {
+        try {
+          setStatus("AI 모델을 불러오고 있어요...");
+
+          model = await tmImage.load(
+            MODEL_URL + "model.json",
+            MODEL_URL + "metadata.json",
+          );
+
+          $("analyzeImage").disabled = !selectedImage;
+
+          $("startCamera").disabled = false;
+
+          $("emptyText").innerHTML =
+            "모델 연결 성공!<br>사진을 올리거나 웹캠을 켜 보세요.";
+
+          setStatus("AI 모델 연결 성공! 🥳");
+        } catch (error) {
+          console.error("모델 로딩 오류:", error);
+
+          setStatus(
+            "모델을 불러오지 못했어요. 모델 주소와 인터넷 연결을 확인해 주세요.",
+          );
+
+          $("emptyText").innerHTML =
+            "모델 연결에 실패했어요.<br>모델 공개 링크를 확인해 주세요.";
+        }
+      }
+
+      // 사진 선택
+      $("imageInput").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+          setStatus("이미지 파일을 선택해 주세요.");
+
+          return;
+        }
+
+        const imageUrl = URL.createObjectURL(file);
+
+        const image = new Image();
+
+        image.onload = () => {
+          if (selectedImage && selectedImage.src.startsWith("blob:")) {
+            URL.revokeObjectURL(selectedImage.src);
+          }
+
+          selectedImage = image;
+
+          $("preview").src = imageUrl;
+
+          $("preview").style.display = "block";
+
+          $("cameraVideo").style.display = "none";
+
+          $("emptyEmoji").classList.add("hidden");
+          $("emptyTitle").classList.add("hidden");
+          $("emptyText").classList.add("hidden");
+
+          $("analyzeImage").disabled = !model;
+
+          resetResults();
+
+          setStatus(
+            model
+              ? "사진이 준비됐어요. 판별하기를 눌러 주세요!"
+              : "사진은 선택됐어요. AI 모델을 불러오는 중이에요.",
+          );
+        };
+
+        image.onerror = () => {
+          URL.revokeObjectURL(imageUrl);
+
+          setStatus("사진을 열 수 없어요. 다른 이미지를 선택해 주세요.");
+        };
+
+        image.src = imageUrl;
+      });
+
+      // 사진 판별
+      $("analyzeImage").addEventListener("click", async () => {
+        if (!model || !selectedImage) return;
+
+        try {
+          $("analyzeImage").disabled = true;
+
+          setStatus("사진을 분석하고 있어요...");
+
+          const predictions = await model.predict(selectedImage);
+
+          showPredictions(predictions);
+        } catch (error) {
+          console.error("사진 분석 오류:", error);
+
+          setStatus("사진 분석 중 문제가 생겼어요.");
+        } finally {
+          $("analyzeImage").disabled = !model;
+        }
+      });
+
+      // 사진 업로드 탭
+      $("uploadTab").addEventListener("click", async () => {
+        $("uploadTab").classList.add("active");
+        $("cameraTab").classList.remove("active");
+
+        $("uploadActions").classList.remove("hidden");
+        $("cameraActions").classList.add("hidden");
+
+        await stopCamera();
+
+        if (selectedImage) {
+          $("preview").style.display = "block";
+        }
+      });
+
+      // 웹캠 탭
+      $("cameraTab").addEventListener("click", () => {
+        $("cameraTab").classList.add("active");
+        $("uploadTab").classList.remove("active");
+
+        $("uploadActions").classList.add("hidden");
+        $("cameraActions").classList.remove("hidden");
+
+        $("preview").style.display = "none";
+        $("cameraVideo").style.display = "none";
+
+        $("emptyEmoji").classList.remove("hidden");
+        $("emptyTitle").classList.remove("hidden");
+        $("emptyText").classList.remove("hidden");
+
+        $("emptyText").textContent =
+          "카메라 켜기를 누르면 실시간으로 판별해요!";
+
+        resetResults();
+      });
+
+      // 웹캠 시작
+      $("startCamera").addEventListener("click", async () => {
+        if (!model || cameraRunning) return;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setStatus("localhost 또는 HTTPS 환경에서 실행해 주세요.");
+
+          return;
+        }
+
+        try {
+          $("startCamera").disabled = true;
+
+          setStatus("카메라 권한을 기다리는 중이에요...");
+
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+            },
+
+            audio: false,
+          });
+
+          const video = $("cameraVideo");
+
+          video.srcObject = cameraStream;
+
+          video.style.display = "block";
+
+          $("emptyEmoji").classList.add("hidden");
+          $("emptyTitle").classList.add("hidden");
+          $("emptyText").classList.add("hidden");
+
+          await video.play();
+
+          cameraRunning = true;
+
+          $("stopCamera").disabled = false;
+
+          setStatus("카메라 분석 중이에요! 🦦");
+
+          cameraLoop();
+        } catch (error) {
+          console.error("카메라 실행 오류:", error);
+
+          await stopCamera();
+
+          $("startCamera").disabled = false;
+
+          if (
+            error.name === "NotAllowedError" ||
+            error.name === "PermissionDeniedError"
+          ) {
+            setStatus(
+              "카메라 권한이 차단됐어요. 브라우저 설정에서 카메라를 허용해 주세요.",
+            );
+          } else if (error.name === "NotFoundError") {
+            setStatus("사용할 수 있는 카메라를 찾지 못했어요.");
+          } else {
+            setStatus(
+              "카메라를 켤 수 없어요. 다른 앱에서 카메라를 사용 중인지 확인해 주세요.",
+            );
+          }
+        }
+      });
+
+      // 웹캠 실시간 분석
+      async function cameraLoop() {
+        if (!cameraRunning || !$("cameraVideo").videoWidth) {
+          if (cameraRunning) {
+            animationId = requestAnimationFrame(cameraLoop);
+          }
+
+          return;
+        }
+
+        try {
+          const predictions = await model.predict($("cameraVideo"));
+
+          if (cameraRunning) {
+            showPredictions(predictions);
+          }
+        } catch (error) {
+          console.error("실시간 분석 오류:", error);
+
+          setStatus("실시간 분석 중 문제가 생겼어요.");
+        }
+
+        if (cameraRunning) {
+          animationId = requestAnimationFrame(cameraLoop);
+        }
+      }
+
+      // 웹캠 종료
+      async function stopCamera() {
+        cameraRunning = false;
+
+        if (animationId !== null) {
+          cancelAnimationFrame(animationId);
+
+          animationId = null;
+        }
+
+        if (cameraStream) {
+          cameraStream.getTracks().forEach((track) => track.stop());
+
+          cameraStream = null;
+        }
+
+        const video = $("cameraVideo");
+
+        video.pause();
+
+        video.srcObject = null;
+
+        video.style.display = "none";
+
+        $("stopCamera").disabled = true;
+
+        $("startCamera").disabled = !model;
+
+        if ($("cameraTab").classList.contains("active")) {
+          $("emptyEmoji").classList.remove("hidden");
+          $("emptyTitle").classList.remove("hidden");
+          $("emptyText").classList.remove("hidden");
+
+          $("emptyText").textContent =
+            "카메라 켜기를 누르면 실시간으로 판별해요!";
+        }
+      }
+
+      // 카메라 끄기 버튼
+      $("stopCamera").addEventListener("click", async () => {
+        await stopCamera();
+
+        setStatus("카메라를 껐어요!");
+      });
+
+      // 웹사이트 실행 시 모델 자동 연결
+      loadModel();
+    </script>
+  </body>
+</html>
